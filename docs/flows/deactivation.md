@@ -1,95 +1,141 @@
 # Deactivation Flow
 
 ## Overview
-The deactivation flow manages the process of deactivating users, subscriptions, and employers in the EmployeeSure system. This includes handling various types of deactivations, security measures, and associated business logic.
+The deactivation flow manages the process of deactivating users, subscriptions, and policies in the EmployeeSure system.
 
 ## High-Level Design
 
 ```mermaid
 graph TB
-    subgraph Client Layer
+    %% Client Layer
+    subgraph ClientLayer[Client Layer]
         Web[Web Client]
         Mobile[Mobile Client]
         AdminPortal[Admin Portal]
         EmployerPortal[Employer Portal]
     end
 
-    subgraph API Layer
+    %% API Layer
+    subgraph APILayer[API Layer]
         DeactivationAPI[Deactivation API]
-        SubscriptionAPI[Subscription API]
-        AuthAPI[Auth API]
         ValidationAPI[Validation API]
+        AuthAPI[Auth API]
         PolicyAPI[Policy API]
+        BillingAPI[Billing API]
+        DocumentAPI[Document API]
     end
 
-    subgraph Service Layer
-        DeactivationService[Deactivation Service]
-        SubscriptionService[Subscription Service]
-        NotificationService[Notification Service]
-        AuthService[Auth Service]
-        ValidationService[Validation Service]
-        CacheService[Cache Service]
-        PolicyService[Policy Service]
+    %% Service Layer
+    subgraph ServiceLayer[Service Layer]
+        subgraph CoreServices[Core Services]
+            DeactivationService[Deactivation Service]
+            PolicyService[Policy Service]
+            BillingService[Billing Service]
+        end
+        
+        subgraph InternalServices[Internal Support Services]
+            ValidationService[Validation Service]
+            AuthService[Auth Service]
+            CacheService[Cache Service]
+            AuditService[Audit Service]
+        end
+
+        subgraph ExternalServices[External Services]
+            NotificationService[Notification Service]
+            DocumentService[Document Service]
+            PaymentService[Payment Service]
+        end
     end
 
-    subgraph Data Layer
+    %% Data Layer
+    subgraph DataLayer[Data Layer]
         DB[(MongoDB)]
         S3[(S3 Storage)]
         Cache[(Redis Cache)]
         Queue[(AWS SQS)]
     end
 
-    %% Client Layer Connections
-    Web --> AuthAPI
-    Mobile --> AuthAPI
-    AdminPortal --> AuthAPI
-    EmployerPortal --> AuthAPI
+    %% Client to API Connections
     Web --> DeactivationAPI
+    Web --> AuthAPI
+    Web --> ValidationAPI
+    Web --> PolicyAPI
+    Web --> BillingAPI
+    Web --> DocumentAPI
     Mobile --> DeactivationAPI
+    Mobile --> AuthAPI
+    Mobile --> ValidationAPI
+    Mobile --> PolicyAPI
+    Mobile --> BillingAPI
+    Mobile --> DocumentAPI
     AdminPortal --> DeactivationAPI
+    AdminPortal --> AuthAPI
+    AdminPortal --> ValidationAPI
+    AdminPortal --> PolicyAPI
+    AdminPortal --> BillingAPI
+    AdminPortal --> DocumentAPI
     EmployerPortal --> DeactivationAPI
+    EmployerPortal --> AuthAPI
+    EmployerPortal --> ValidationAPI
+    EmployerPortal --> PolicyAPI
+    EmployerPortal --> BillingAPI
+    EmployerPortal --> DocumentAPI
 
-    %% API Layer Connections
-    AuthAPI --> AuthService
+    %% API to Service Connections
     DeactivationAPI --> DeactivationService
-    SubscriptionAPI --> SubscriptionService
     ValidationAPI --> ValidationService
+    AuthAPI --> AuthService
     PolicyAPI --> PolicyService
+    BillingAPI --> BillingService
+    DocumentAPI --> DocumentService
 
-    %% Service Layer Connections
+    %% Core Service Connections
     DeactivationService --> ValidationService
-    SubscriptionService --> ValidationService
-    PolicyService --> ValidationService
     DeactivationService --> NotificationService
-    SubscriptionService --> NotificationService
-    PolicyService --> NotificationService
+    DeactivationService --> PolicyService
+    DeactivationService --> BillingService
     DeactivationService --> CacheService
-    SubscriptionService --> CacheService
+    DeactivationService --> DocumentService
+    DeactivationService --> AuditService
+    DeactivationService --> PaymentService
+    PolicyService --> ValidationService
     PolicyService --> CacheService
+    PolicyService --> DocumentService
+    PolicyService --> AuditService
+    BillingService --> ValidationService
+    BillingService --> CacheService
+    BillingService --> NotificationService
+    BillingService --> AuditService
+    BillingService --> PaymentService
 
     %% Service to Data Connections
     DeactivationService --> DB
-    SubscriptionService --> DB
-    PolicyService --> DB
-    DeactivationService --> Cache
-    SubscriptionService --> Cache
-    PolicyService --> Cache
     DeactivationService --> Queue
-    SubscriptionService --> Queue
-    PolicyService --> Queue
-
-    %% Data Layer Connections
-    Queue --> NotificationService
+    PolicyService --> DB
+    PolicyService --> Cache
+    BillingService --> DB
+    BillingService --> Queue
+    ValidationService --> DB
+    ValidationService --> Cache
+    DocumentService --> DB
+    DocumentService --> S3
+    AuditService --> DB
+    AuditService --> S3
     CacheService --> Cache
 
+    %% Styling
     classDef client fill:#f9f,stroke:#333,stroke-width:2px
     classDef api fill:#bbf,stroke:#333,stroke-width:2px
-    classDef service fill:#bfb,stroke:#333,stroke-width:2px
-    classDef data fill:#fbb,stroke:#333,stroke-width:2px
+    classDef coreService fill:#bfb,stroke:#333,stroke-width:2px
+    classDef internalService fill:#fbb,stroke:#333,stroke-width:2px
+    classDef externalService fill:#ff9,stroke:#333,stroke-width:2px
+    classDef data fill:#ddd,stroke:#333,stroke-width:2px
 
     class Web,Mobile,AdminPortal,EmployerPortal client
-    class DeactivationAPI,SubscriptionAPI,AuthAPI,ValidationAPI,PolicyAPI api
-    class DeactivationService,SubscriptionService,NotificationService,AuthService,ValidationService,CacheService,PolicyService service
+    class DeactivationAPI,ValidationAPI,AuthAPI,PolicyAPI,BillingAPI,DocumentAPI api
+    class DeactivationService,PolicyService,BillingService coreService
+    class ValidationService,AuthService,CacheService,AuditService internalService
+    class NotificationService,DocumentService,PaymentService externalService
     class DB,S3,Cache,Queue data
 ```
 
@@ -99,69 +145,135 @@ graph TB
 sequenceDiagram
     participant Client
     participant Server
-    participant OTP
-    participant DeactivationService
+    participant DeactivationController
+    participant ValidationService
     participant SubscriptionService
     participant Database
     participant NotificationService
-    participant PaymentService
+    participant DocumentService
 
-    %% OTP Generation Flow
-    Client->>Server: POST /api/v1/deactivate/generate-otp
-    Note over Client,Server: Request Body:<br/>{<br/>  "reason": "deactivation_reason",<br/>  "medium": "email/sms"<br/>}
-    Server->>OTP: Generate OTP
-    OTP-->>Server: OTP Generated
-    Server->>NotificationService: Send OTP
-    NotificationService-->>Client: OTP Delivered
-    Server-->>Client: OTP Request ID
-    Note over Server,Client: Response Body:<br/>{<br/>  "request_id": "otp_request_id",<br/>  "success": true<br/>}
+    %% Deactivation Request Flow
+    Client->>Server: POST /api/v1/deactivation/request
+    Note over Client,Server: Request Body:<br/>{<br/>  "user_id": "user_id",<br/>  "reason": "reason",<br/>  "effective_date": "date",<br/>  "documents": ["document_urls"]<br/>}<br/>Headers:<br/>- Authorization: Bearer jwt_token<br/>- Content-Type: application/json
+    Server->>DeactivationController: Process Request
+    DeactivationController->>ValidationService: Validate Request
+    ValidationService-->>DeactivationController: Validation Result
+    DeactivationController->>SubscriptionService: Check Active Subscriptions
+    SubscriptionService-->>DeactivationController: Subscription Status
+    DeactivationController->>Database: Store Request
+    Database-->>DeactivationController: Request Stored
+    DeactivationController->>DocumentService: Process Documents
+    DocumentService-->>DeactivationController: Document Processing
+    DeactivationController->>NotificationService: Send Request Notification
+    NotificationService-->>Client: Request Confirmation
+    DeactivationController-->>Client: Request Status
+    Note over DeactivationController,Client: Response Body:<br/>{<br/>  "request_id": "request_id",<br/>  "status": "status",<br/>  "message": "request_message"<br/>}
 
-    %% Deactivation Flow
-    Client->>Server: POST /api/v1/deactivate
-    Note over Client,Server: Request Body:<br/>{<br/>  "request_id": "otp_request_id",<br/>  "reason": "deactivation_reason",<br/>  "one_time_password": "otp",<br/>  "value": [deactivation_details]<br/>}
-    Server->>OTP: Validate OTP
-    OTP-->>Server: OTP Validated
-    Server->>DeactivationService: Process Deactivation
-    DeactivationService->>SubscriptionService: Deactivate Subscriptions
-    SubscriptionService->>Database: Update Subscription Status
-    Database-->>SubscriptionService: Status Updated
-    DeactivationService->>PaymentService: Deactivate Payment
-    PaymentService-->>DeactivationService: Payment Deactivated
-    DeactivationService->>NotificationService: Send Deactivation Notification
-    NotificationService-->>Client: Deactivation Notification
-    Server-->>Client: Deactivation Confirmation
-    Note over Server,Client: Response Body:<br/>{<br/>  "success": true,<br/>  "message": "Successfully deactivated"<br/>}
+    %% Get Deactivation Status Flow
+    Client->>Server: GET /api/v1/deactivation/:id/status
+    Note over Client,Server: Headers:<br/>- Authorization: Bearer jwt_token
+    Server->>DeactivationController: Get Status
+    DeactivationController->>Database: Fetch Request
+    Database-->>DeactivationController: Request Data
+    DeactivationController-->>Client: Status Response
+    Note over DeactivationController,Client: Response Body:<br/>{<br/>  "request_id": "request_id",<br/>  "status": "status",<br/>  "details": {<br/>    "reason": "reason",<br/>    "effective_date": "date",<br/>    "created_at": "timestamp"<br/>  }<br/>}
+
+    %% Deactivation Approval Flow
+    Client->>Server: POST /api/v1/deactivation/:id/approve
+    Note over Client,Server: Headers:<br/>- Authorization: Bearer jwt_token
+    Server->>DeactivationController: Process Approval
+    DeactivationController->>ValidationService: Validate Approval
+    ValidationService-->>DeactivationController: Validation Result
+    DeactivationController->>SubscriptionService: Cancel Subscriptions
+    SubscriptionService-->>DeactivationController: Cancellation Confirmation
+    DeactivationController->>Database: Update Status
+    Database-->>DeactivationController: Status Updated
+    DeactivationController->>NotificationService: Send Approval Notification
+    NotificationService-->>Client: Approval Notification
+    DeactivationController-->>Client: Approval Status
+    Note over DeactivationController,Client: Response Body:<br/>{<br/>  "request_id": "request_id",<br/>  "status": "status",<br/>  "message": "approval_message"<br/>}
+
+    %% Deactivation Rejection Flow
+    Client->>Server: POST /api/v1/deactivation/:id/reject
+    Note over Client,Server: Request Body:<br/>{<br/>  "reason": "rejection_reason"<br/>}<br/>Headers:<br/>- Authorization: Bearer jwt_token<br/>- Content-Type: application/json
+    Server->>DeactivationController: Process Rejection
+    DeactivationController->>ValidationService: Validate Rejection
+    ValidationService-->>DeactivationController: Validation Result
+    DeactivationController->>Database: Update Status
+    Database-->>DeactivationController: Status Updated
+    DeactivationController->>NotificationService: Send Rejection Notification
+    NotificationService-->>Client: Rejection Notification
+    DeactivationController-->>Client: Rejection Status
+    Note over DeactivationController,Client: Response Body:<br/>{<br/>  "request_id": "request_id",<br/>  "status": "status",<br/>  "message": "rejection_message"<br/>}
+
+    %% Cancel Deactivation Request Flow
+    Client->>Server: POST /api/v1/deactivation/:id/cancel
+    Note over Client,Server: Headers:<br/>- Authorization: Bearer jwt_token
+    Server->>DeactivationController: Process Cancellation
+    DeactivationController->>ValidationService: Validate Cancellation
+    ValidationService-->>DeactivationController: Validation Result
+    DeactivationController->>Database: Update Status
+    Database-->>DeactivationController: Status Updated
+    DeactivationController->>NotificationService: Send Cancellation Notification
+    NotificationService-->>Client: Cancellation Notification
+    DeactivationController-->>Client: Cancellation Status
+    Note over DeactivationController,Client: Response Body:<br/>{<br/>  "request_id": "request_id",<br/>  "status": "status",<br/>  "message": "cancellation_message"<br/>}
 ```
 
 ## API Endpoints
 
-### Generate OTP
+### Request Deactivation
 ```http
-POST /api/v1/deactivate/generate-otp
+POST /api/v1/deactivation/request
 Content-Type: application/json
+Authorization: Bearer <jwt_token>
 
 {
-    "reason": "deactivation_reason",
-    "medium": "email/sms"
+    "user_id": "string",
+    "reason": "string",
+    "effective_date": "date",
+    "documents": ["string"]
 }
 ```
 
-### Deactivate
+### Approve Deactivation
 ```http
-POST /api/v1/deactivate
+POST /api/v1/deactivation/:id/approve
+Authorization: Bearer <jwt_token>
+```
+
+### Reject Deactivation
+```http
+POST /api/v1/deactivation/:id/reject
 Content-Type: application/json
+Authorization: Bearer <jwt_token>
 
 {
-    "request_id": "otp_request_id",
-    "reason": "deactivation_reason",
-    "one_time_password": "otp",
-    "value": [
-        {
-            "id": "user_id",
-            "type": "user_type"
-        }
-    ]
+    "reason": "string"
 }
+```
+
+### Get Deactivation Status
+```http
+GET /api/v1/deactivation/:id/status
+Authorization: Bearer <jwt_token>
+```
+
+### List Deactivation Requests
+```http
+GET /api/v1/deactivation/requests
+Authorization: Bearer <jwt_token>
+Query Parameters:
+- status: string (optional)
+- user_id: string (optional)
+- start_date: date (optional)
+- end_date: date (optional)
+```
+
+### Cancel Deactivation Request
+```http
+POST /api/v1/deactivation/:id/cancel
+Authorization: Bearer <jwt_token>
 ```
 
 ## Data Models

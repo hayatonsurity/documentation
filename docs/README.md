@@ -5,14 +5,17 @@ This documentation provides detailed information about various flows in the Empl
 ## Table of Contents
 
 1. [Authentication Flow](./flows/authentication.md)
-2. [Billing Flow](./flows/billing.md)
-3. [Hospital Integration Flow](./flows/hospital-integration.md)
-4. [Policy Management Flow](./flows/policy-management.md)
-5. [Employer Dashboard Flow](./flows/employer-dashboard.md)
-6. [Claim Support Flow](./flows/claim-support.md)
-7. [Subscription Management Flow](./flows/subscription-management.md)
-8. [File Upload Flow](./flows/file-upload.md)
-9. [Deactivation Flow](./flows/deactivation.md)
+2. [Deactivation Flow](./flows/deactivation.md)
+3. [Purchase Flow](./flows/purchase.md)
+4. [Onboarding Flow](./flows/onboarding.md)
+5. [Billing Flow](./flows/billing.md)
+6. [Hospital Integration Flow](./flows/hospital-integration.md)
+7. [Policy Management Flow](./flows/policy-management.md)
+8. [Employer Dashboard Flow](./flows/employer-dashboard.md)
+9. [Claim Support Flow](./flows/claim-support.md)
+10. [Subscription Management Flow](./flows/subscription-management.md)
+11. [File Upload Flow](./flows/file-upload.md)
+
 
 ## Overview
 
@@ -29,16 +32,3 @@ Each flow documentation contains:
 - Error handling
 - Security considerations
 - Integration points 
-
-docs/
-├── README.md
-└── flows/
-    ├── authentication.md
-    ├── billing.md
-    ├── hospital-integration.md
-    ├── policy-management.md
-    ├── employer-dashboard.md
-    ├── claim-support.md
-    ├── subscription-management.md
-    ├── file-upload.md
-    └── deactivation.md

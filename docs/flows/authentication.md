@@ -1,98 +1,143 @@
 # Authentication Flow
 
 ## Overview
-The authentication flow in EmployeeSure handles user authentication, authorization, and session management.
+The authentication flow manages user authentication, authorization, and session management in the EmployeeSure system.
 
 ## High-Level Design
 
 ```mermaid
 graph TB
-    subgraph Client Layer
+    %% Client Layer
+    subgraph ClientLayer[Client Layer]
         Web[Web Client]
         Mobile[Mobile Client]
         AdminPortal[Admin Portal]
         EmployerPortal[Employer Portal]
-        HospitalPortal[Hospital Portal]
     end
 
-    subgraph API Layer
+    %% API Layer
+    subgraph APILayer[API Layer]
         AuthAPI[Auth API]
         ValidationAPI[Validation API]
-        PolicyAPI[Policy API]
-        SubscriptionAPI[Subscription API]
+        ProfileAPI[Profile API]
+        VerificationAPI[Verification API]
+        DocumentAPI[Document API]
     end
 
-    subgraph Service Layer
-        AuthService[Auth Service]
-        ValidationService[Validation Service]
-        NotificationService[Notification Service]
-        CacheService[Cache Service]
-        PolicyService[Policy Service]
-        SubscriptionService[Subscription Service]
+    %% Service Layer
+    subgraph ServiceLayer[Service Layer]
+        subgraph CoreServices[Core Services]
+            AuthService[Auth Service]
+            ProfileService[Profile Service]
+            VerificationService[Verification Service]
+        end
+        
+        subgraph InternalServices[Internal Support Services]
+            ValidationService[Validation Service]
+            CacheService[Cache Service]
+            AuditService[Audit Service]
+            SecurityService[Security Service]
+        end
+
+        subgraph ExternalServices[External Services]
+            NotificationService[Notification Service]
+            DocumentService[Document Service]
+            SSOService[SSO Service]
+            OAuthService[OAuth Service]
+        end
     end
 
-    subgraph Data Layer
+    %% Data Layer
+    subgraph DataLayer[Data Layer]
         DB[(MongoDB)]
         S3[(S3 Storage)]
         Cache[(Redis Cache)]
         Queue[(AWS SQS)]
     end
 
-    %% Client Layer Connections
+    %% Client to API Connections
     Web --> AuthAPI
-    Mobile --> AuthAPI
-    AdminPortal --> AuthAPI
-    EmployerPortal --> AuthAPI
     Web --> ValidationAPI
+    Web --> ProfileAPI
+    Web --> VerificationAPI
+    Web --> DocumentAPI
+    Mobile --> AuthAPI
     Mobile --> ValidationAPI
+    Mobile --> ProfileAPI
+    Mobile --> VerificationAPI
+    Mobile --> DocumentAPI
+    AdminPortal --> AuthAPI
     AdminPortal --> ValidationAPI
+    AdminPortal --> ProfileAPI
+    AdminPortal --> VerificationAPI
+    AdminPortal --> DocumentAPI
+    EmployerPortal --> AuthAPI
     EmployerPortal --> ValidationAPI
-    HospitalPortal --> AuthAPI
+    EmployerPortal --> ProfileAPI
+    EmployerPortal --> VerificationAPI
+    EmployerPortal --> DocumentAPI
 
-    %% API Layer Connections
+    %% API to Service Connections
     AuthAPI --> AuthService
     ValidationAPI --> ValidationService
-    PolicyAPI --> PolicyService
-    SubscriptionAPI --> SubscriptionService
+    ProfileAPI --> ProfileService
+    VerificationAPI --> VerificationService
+    DocumentAPI --> DocumentService
 
-    %% Service Layer Connections
+    %% Core Service Connections
     AuthService --> ValidationService
-    ValidationService --> NotificationService
-    PolicyService --> ValidationService
-    AuthService --> CacheService
-    ValidationService --> CacheService
-    PolicyService --> CacheService
-    SubscriptionService --> ValidationService
     AuthService --> NotificationService
-    PolicyService --> NotificationService
-    SubscriptionService --> NotificationService
+    AuthService --> ProfileService
+    AuthService --> VerificationService
+    AuthService --> CacheService
+    AuthService --> DocumentService
+    AuthService --> AuditService
+    AuthService --> SecurityService
+    AuthService --> SSOService
+    AuthService --> OAuthService
+    ProfileService --> ValidationService
+    ProfileService --> CacheService
+    ProfileService --> DocumentService
+    ProfileService --> AuditService
+    ProfileService --> SecurityService
+    VerificationService --> ValidationService
+    VerificationService --> CacheService
+    VerificationService --> NotificationService
+    VerificationService --> AuditService
+    VerificationService --> SecurityService
 
     %% Service to Data Connections
     AuthService --> DB
-    ValidationService --> DB
-    PolicyService --> DB
-    SubscriptionService --> DB
     AuthService --> Cache
-    ValidationService --> Cache
-    PolicyService --> Cache
-    SubscriptionService --> Cache
     AuthService --> Queue
-    ValidationService --> Queue
-    PolicyService --> Queue
-    SubscriptionService --> Queue
-
-    %% Data Layer Connections
-    Queue --> NotificationService
+    ProfileService --> DB
+    ProfileService --> S3
+    ProfileService --> Cache
+    VerificationService --> DB
+    VerificationService --> Cache
+    ValidationService --> DB
+    ValidationService --> Cache
+    DocumentService --> DB
+    DocumentService --> S3
+    AuditService --> DB
+    AuditService --> S3
+    SecurityService --> DB
+    SecurityService --> Cache
     CacheService --> Cache
 
+    %% Styling
     classDef client fill:#f9f,stroke:#333,stroke-width:2px
     classDef api fill:#bbf,stroke:#333,stroke-width:2px
-    classDef service fill:#bfb,stroke:#333,stroke-width:2px
-    classDef data fill:#fbb,stroke:#333,stroke-width:2px
+    classDef coreService fill:#bfb,stroke:#333,stroke-width:2px
+    classDef internalService fill:#fbb,stroke:#333,stroke-width:2px
+    classDef externalService fill:#ff9,stroke:#333,stroke-width:2px
+    classDef data fill:#ddd,stroke:#333,stroke-width:2px
 
-    class Web,Mobile,AdminPortal,EmployerPortal,HospitalPortal client
-    class AuthAPI,ValidationAPI,PolicyAPI,SubscriptionAPI api
-    class AuthService,ValidationService,NotificationService,CacheService,PolicyService,SubscriptionService service
+    class Web,Mobile,AdminPortal,EmployerPortal client
+    class AuthAPI,ValidationAPI,ProfileAPI,VerificationAPI,DocumentAPI api
+    class AuthService,ProfileService,VerificationService coreService
+    class ValidationService,CacheService,AuditService,SecurityService internalService
+    class NotificationService,DocumentService,SSOService,OAuthService externalService
     class DB,S3,Cache,Queue data
 ```
 
@@ -105,6 +150,7 @@ sequenceDiagram
     participant Redis
     participant JWT
     participant Database
+    participant NotificationService
 
     %% Initial Login
     Client->>Server: POST /api/v1/auth/login
@@ -122,6 +168,37 @@ sequenceDiagram
     else Invalid Credentials
         Server-->>Client: 401 Unauthorized
         Note over Server,Client: Response Body:<br/>{<br/>  "error": "Invalid credentials"<br/>}<br/>Headers:<br/>- Content-Type: application/json
+    end
+
+    %% OTP Generation Flow
+    Client->>Server: POST /api/v1/auth/otp/generate
+    Note over Client,Server: Request Body:<br/>{<br/>  "email": "user@example.com",<br/>  "purpose": "login"<br/>}<br/>Headers:<br/>- Content-Type: application/json
+    Server->>Database: Verify User Exists
+    Database-->>Server: User Data
+    Server->>NotificationService: Generate & Send OTP
+    NotificationService-->>Client: Send OTP via Email/SMS
+    Server->>Redis: Store OTP
+    Redis-->>Server: OTP Stored
+    Server-->>Client: OTP Generation Confirmation
+    Note over Server,Client: Response Body:<br/>{<br/>  "message": "OTP sent successfully",<br/>  "expires_in": "5 minutes"<br/>}<br/>Headers:<br/>- Content-Type: application/json
+
+    %% OTP Verification Flow
+    Client->>Server: POST /api/v1/auth/otp/verify
+    Note over Client,Server: Request Body:<br/>{<br/>  "email": "user@example.com",<br/>  "otp": "123456",<br/>  "purpose": "login"<br/>}<br/>Headers:<br/>- Content-Type: application/json
+    Server->>Redis: Verify OTP
+    Redis-->>Server: OTP Status
+    alt Valid OTP
+        Server->>JWT: Generate Token
+        JWT-->>Server: JWT Token
+        Server->>Redis: Store Session
+        Redis-->>Server: Session Stored
+        Server->>Redis: Invalidate OTP
+        Redis-->>Server: OTP Invalidated
+        Server-->>Client: Authentication Success
+        Note over Server,Client: Response Body:<br/>{<br/>  "token": "jwt_token",<br/>  "user": {<br/>    "id": "user_id",<br/>    "email": "user@example.com",<br/>    "role": "user_role"<br/>  }<br/>}<br/>Headers:<br/>- Content-Type: application/json
+    else Invalid OTP
+        Server-->>Client: 401 Unauthorized
+        Note over Server,Client: Response Body:<br/>{<br/>  "error": "Invalid or expired OTP"<br/>}<br/>Headers:<br/>- Content-Type: application/json
     end
 
     %% Token Validation
@@ -159,6 +236,29 @@ Content-Type: application/json
 {
     "email": "user@example.com",
     "password": "password"
+}
+```
+
+### OTP Generation
+```http
+POST /api/v1/auth/otp/generate
+Content-Type: application/json
+
+{
+    "email": "user@example.com",
+    "purpose": "login|verification|password_reset"
+}
+```
+
+### OTP Verification
+```http
+POST /api/v1/auth/otp/verify
+Content-Type: application/json
+
+{
+    "email": "user@example.com",
+    "otp": "123456",
+    "purpose": "login|verification|password_reset"
 }
 ```
 

@@ -1,94 +1,166 @@
 # Claim Support Flow
 
 ## Overview
-The claim support flow in EmployeeSure handles the submission, verification, and settlement of insurance claims.
+The claim support flow manages the processing, validation, and resolution of insurance claims in the EmployeeSure system.
 
 ## High-Level Design
 
 ```mermaid
 graph TB
-    subgraph Client Layer
+    %% Client Layer
+    subgraph ClientLayer[Client Layer]
         Web[Web Client]
         Mobile[Mobile Client]
         AdminPortal[Admin Portal]
+        EmployerPortal[Employer Portal]
         HospitalPortal[Hospital Portal]
     end
 
-    subgraph API Layer
+    %% API Layer
+    subgraph APILayer[API Layer]
         ClaimAPI[Claim API]
-        DocumentAPI[Document API]
+        ValidationAPI[Validation API]
         AuthAPI[Auth API]
-        BeneficiaryAPI[Beneficiary API]
-        PolicyAPI[Policy API]
+        SupportAPI[Support API]
+        HospitalAPI[Hospital API]
+        PaymentAPI[Payment API]
+        DocumentAPI[Document API]
     end
 
-    subgraph Service Layer
-        ClaimService[Claim Service]
-        DocumentService[Document Service]
-        NotificationService[Notification Service]
-        AuthService[Auth Service]
-        ValidationService[Validation Service]
-        CacheService[Cache Service]
-        BillingService[Billing Service]
+    %% Service Layer
+    subgraph ServiceLayer[Service Layer]
+        subgraph CoreServices[Core Services]
+            ClaimService[Claim Service]
+            SupportService[Support Service]
+            PolicyService[Policy Service]
+            HospitalService[Hospital Service]
+        end
+        
+        subgraph InternalServices[Internal Services]
+            ValidationService[Validation Service]
+            AuthService[Auth Service]
+            CacheService[Cache Service]
+            AuditService[Audit Service]
+        end
+
+        subgraph ExternalServices[External Services]
+            NotificationService[Notification Service]
+            DocumentService[Document Service]
+            PaymentService[Payment Service]
+            ReportService[Report Service]
+        end
     end
 
-    subgraph Data Layer
+    %% Data Layer
+    subgraph DataLayer[Data Layer]
         DB[(MongoDB)]
         S3[(S3 Storage)]
         Cache[(Redis Cache)]
         Queue[(AWS SQS)]
     end
 
-    %% Client Layer Connections
-    Web --> AuthAPI
-    Mobile --> AuthAPI
-    AdminPortal --> AuthAPI
-    HospitalPortal --> AuthAPI
+    %% Client to API Connections
     Web --> ClaimAPI
+    Web --> AuthAPI
+    Web --> HospitalAPI
+    Web --> PaymentAPI
+    Web --> ValidationAPI
     Mobile --> ClaimAPI
+    Mobile --> AuthAPI
+    Mobile --> HospitalAPI
+    Mobile --> PaymentAPI
+    Mobile --> ValidationAPI
     AdminPortal --> ClaimAPI
+    AdminPortal --> AuthAPI
+    AdminPortal --> HospitalAPI
+    AdminPortal --> PaymentAPI
+    AdminPortal --> ValidationAPI
+    EmployerPortal --> ClaimAPI
+    EmployerPortal --> AuthAPI
+    EmployerPortal --> HospitalAPI
+    EmployerPortal --> PaymentAPI
+    EmployerPortal --> ValidationAPI
     HospitalPortal --> ClaimAPI
-    Web --> BeneficiaryAPI
-    Mobile --> BeneficiaryAPI
-    AdminPortal --> BeneficiaryAPI
-    HospitalPortal --> BeneficiaryAPI
+    HospitalPortal --> AuthAPI
+    HospitalPortal --> HospitalAPI
+    HospitalPortal --> PaymentAPI
+    HospitalPortal --> ValidationAPI
 
-    %% API Layer Connections
-    AuthAPI --> AuthService
+    %% API to Service Connections
     ClaimAPI --> ClaimService
-    ClaimAPI --> DocumentAPI
-    ClaimAPI --> PolicyAPI
+    ValidationAPI --> ValidationService
+    AuthAPI --> AuthService
+    SupportAPI --> SupportService
+    HospitalAPI --> HospitalService
+    PaymentAPI --> PaymentService
     DocumentAPI --> DocumentService
-    BeneficiaryAPI --> ClaimService
-    PolicyAPI --> ClaimService
 
-    %% Service Layer Connections
-    ClaimService --> ValidationService
-    DocumentService --> ValidationService
-    ClaimService --> DB
-    ClaimService --> Cache
-    DocumentService --> S3
-    ClaimService --> Queue
-    DocumentService --> Queue
+    %% Core Service to Validation API Connections
+    ClaimService --> ValidationAPI
+    SupportService --> ValidationAPI
+    PolicyService --> ValidationAPI
+    HospitalService --> ValidationAPI
+
+    %% Core Service Connections
     ClaimService --> NotificationService
-    DocumentService --> NotificationService
+    ClaimService --> PolicyService
+    ClaimService --> DocumentService
     ClaimService --> CacheService
-    DocumentService --> CacheService
-    ClaimService --> BillingService
-    DocumentService --> BillingService
+    ClaimService --> AuditService
+    SupportService --> NotificationService
+    SupportService --> CacheService
+    SupportService --> AuditService
+    PolicyService --> CacheService
+    PolicyService --> AuditService
+    HospitalService --> CacheService
+    HospitalService --> AuditService
 
-    %% Data Layer Connections
-    Queue --> NotificationService
+    %% Internal Service Connections
+    ValidationService --> AuthService
+    ValidationService --> CacheService
+    ValidationService --> AuditService
+    AuthService --> CacheService
+    AuthService --> AuditService
+    CacheService --> AuditService
+
+    %% External Service Connections
+    NotificationService --> DocumentService
+    DocumentService --> PaymentService
+    PaymentService --> ReportService
+
+    %% Service to Data Connections
+    ClaimService --> DB
+    ClaimService --> S3
+    ClaimService --> Queue
+    SupportService --> DB
+    SupportService --> Queue
+    PolicyService --> DB
+    PolicyService --> Cache
+    HospitalService --> DB
+    HospitalService --> Cache
+    ValidationService --> DB
+    ValidationService --> Cache
+    DocumentService --> DB
+    DocumentService --> S3
+    PaymentService --> DB
+    PaymentService --> Queue
     CacheService --> Cache
+    AuditService --> DB
+    AuditService --> S3
 
+    %% Styling
     classDef client fill:#f9f,stroke:#333,stroke-width:2px
     classDef api fill:#bbf,stroke:#333,stroke-width:2px
-    classDef service fill:#bfb,stroke:#333,stroke-width:2px
-    classDef data fill:#fbb,stroke:#333,stroke-width:2px
+    classDef coreService fill:#bfb,stroke:#333,stroke-width:2px
+    classDef internalService fill:#fbb,stroke:#333,stroke-width:2px
+    classDef externalService fill:#ff9,stroke:#333,stroke-width:2px
+    classDef data fill:#ddd,stroke:#333,stroke-width:2px
 
-    class Web,Mobile,AdminPortal,HospitalPortal client
-    class ClaimAPI,DocumentAPI,AuthAPI,BeneficiaryAPI,PolicyAPI api
-    class ClaimService,DocumentService,NotificationService,AuthService,ValidationService,CacheService,BillingService service
+    class Web,Mobile,AdminPortal,EmployerPortal,HospitalPortal client
+    class ClaimAPI,ValidationAPI,AuthAPI,SupportAPI,HospitalAPI,PaymentAPI,DocumentAPI api
+    class ClaimService,SupportService,PolicyService,HospitalService coreService
+    class ValidationService,AuthService,CacheService,AuditService internalService
+    class NotificationService,DocumentService,PaymentService,ReportService externalService
     class DB,S3,Cache,Queue data
 ```
 
@@ -100,20 +172,26 @@ sequenceDiagram
     participant Server
     participant ClaimController
     participant HospitalController
+    participant ValidationService
     participant Database
     participant NotificationService
     participant PaymentService
     participant DocumentService
+    participant AuditService
 
     %% Claim Submission Flow
     Client->>Server: POST /api/v1/claim/submit
     Note over Client,Server: Request Body:<br/>{<br/>  "policy_id": "policy_id",<br/>  "hospital_id": "hospital_id",<br/>  "treatment_type": "treatment_type",<br/>  "amount": "amount",<br/>  "documents": ["document_urls"]<br/>}<br/>Headers:<br/>- Authorization: Bearer jwt_token<br/>- Content-Type: application/json
     Server->>ClaimController: Submit Claim
+    ClaimController->>ValidationService: Validate Request
+    ValidationService-->>ClaimController: Validation Result
     ClaimController->>HospitalController: Validate Hospital
     HospitalController-->>ClaimController: Hospital Validation
     ClaimController->>Database: Store Claim
     ClaimController->>DocumentService: Store Documents
     DocumentService-->>ClaimController: Document Confirmation
+    ClaimController->>AuditService: Log Claim Submission
+    AuditService-->>ClaimController: Audit Confirmation
     ClaimController->>NotificationService: Send Claim Notification
     NotificationService-->>Client: Claim Submission Notification
     ClaimController-->>Client: Claim Details
@@ -123,8 +201,12 @@ sequenceDiagram
     Client->>Server: POST /api/v1/claim/:id/verify
     Note over Client,Server: Request Body:<br/>{<br/>  "verification_status": "status",<br/>  "verification_notes": "notes"<br/>}<br/>Headers:<br/>- Authorization: Bearer jwt_token<br/>- Content-Type: application/json
     Server->>ClaimController: Verify Claim
+    ClaimController->>ValidationService: Validate Request
+    ValidationService-->>ClaimController: Validation Result
     ClaimController->>Database: Update Claim Status
     Database-->>ClaimController: Update Confirmation
+    ClaimController->>AuditService: Log Verification
+    AuditService-->>ClaimController: Audit Confirmation
     ClaimController->>NotificationService: Send Verification Notification
     NotificationService-->>Client: Verification Notification
     ClaimController-->>Client: Verification Status
@@ -134,9 +216,13 @@ sequenceDiagram
     Client->>Server: POST /api/v1/claim/:id/settle
     Note over Client,Server: Request Body:<br/>{<br/>  "settlement_amount": "amount",<br/>  "settlement_notes": "notes"<br/>}<br/>Headers:<br/>- Authorization: Bearer jwt_token<br/>- Content-Type: application/json
     Server->>ClaimController: Settle Claim
+    ClaimController->>ValidationService: Validate Request
+    ValidationService-->>ClaimController: Validation Result
     ClaimController->>PaymentService: Process Payment
     PaymentService-->>ClaimController: Payment Confirmation
     ClaimController->>Database: Update Settlement Status
+    ClaimController->>AuditService: Log Settlement
+    AuditService-->>ClaimController: Audit Confirmation
     ClaimController->>NotificationService: Send Settlement Notification
     NotificationService-->>Client: Settlement Notification
     ClaimController-->>Client: Settlement Status
@@ -146,10 +232,28 @@ sequenceDiagram
     Client->>Server: GET /api/v1/claim/:id/status
     Note over Client,Server: Headers:<br/>- Authorization: Bearer jwt_token
     Server->>ClaimController: Get Claim Status
+    ClaimController->>ValidationService: Validate Request
+    ValidationService-->>ClaimController: Validation Result
     ClaimController->>Database: Fetch Claim Data
     Database-->>ClaimController: Claim Data
     ClaimController-->>Client: Claim Status
     Note over ClaimController,Client: Response Body:<br/>{<br/>  "claim_id": "claim_id",<br/>  "status": "status",<br/>  "treatment_type": "type",<br/>  "amount": "amount",<br/>  "verification_status": "status",<br/>  "settlement_status": "status"<br/>}<br/>Headers:<br/>- Content-Type: application/json
+
+    %% Hospital Registration Flow
+    Client->>Server: POST /api/v1/hospital/register
+    Note over Client,Server: Request Body:<br/>{<br/>  "name": "name",<br/>  "address": "address",<br/>  "contact": "contact",<br/>  "documents": ["document_urls"]<br/>}<br/>Headers:<br/>- Authorization: Bearer jwt_token<br/>- Content-Type: application/json
+    Server->>HospitalController: Register Hospital
+    HospitalController->>ValidationService: Validate Request
+    ValidationService-->>HospitalController: Validation Result
+    HospitalController->>Database: Store Hospital
+    HospitalController->>DocumentService: Store Documents
+    DocumentService-->>HospitalController: Document Confirmation
+    HospitalController->>AuditService: Log Registration
+    AuditService-->>HospitalController: Audit Confirmation
+    HospitalController->>NotificationService: Send Registration Notification
+    NotificationService-->>Client: Registration Notification
+    HospitalController-->>Client: Hospital Details
+    Note over HospitalController,Client: Response Body:<br/>{<br/>  "hospital_id": "hospital_id",<br/>  "status": "status",<br/>  "document_urls": ["urls"],<br/>  "message": "registration_message"<br/>}<br/>Headers:<br/>- Content-Type: application/json
 ```
 
 ## API Endpoints
@@ -197,6 +301,20 @@ Authorization: Bearer <jwt_token>
 ```http
 GET /api/v1/claim/:id/status
 Authorization: Bearer <jwt_token>
+```
+
+### Hospital Registration
+```http
+POST /api/v1/hospital/register
+Content-Type: application/json
+Authorization: Bearer <jwt_token>
+
+{
+    "name": "string",
+    "address": "string",
+    "contact": "string",
+    "documents": ["string"]
+}
 ```
 
 ## Data Models

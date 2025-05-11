@@ -5,16 +5,18 @@ This documentation provides detailed information about various flows in the Empl
 ## Table of Contents
 
 1. [Authentication Flow](./flows/authentication.md)
-2. [Deactivation Flow](./flows/deactivation.md)
-3. [Purchase Flow](./flows/purchase.md)
-4. [Onboarding Flow](./flows/onboarding.md)
-5. [Billing Flow](./flows/billing.md)
-6. [Hospital Integration Flow](./flows/hospital-integration.md)
-7. [Policy Management Flow](./flows/policy-management.md)
-8. [Employer Dashboard Flow](./flows/employer-dashboard.md)
-9. [Claim Support Flow](./flows/claim-support.md)
-10. [Subscription Management Flow](./flows/subscription-management.md)
-11. [File Upload Flow](./flows/file-upload.md)
+2. [Activation Flow](./flows/activation.md)
+3. [Deactivation Flow](./flows/deactivation.md)
+4. [Purchase Flow](./flows/purchase.md)
+5. [Onboarding Flow](./flows/onboarding.md)
+6. [Billing Flow](./flows/billing.md)
+7. [Invoice Flow](./flows/invoice.md)
+8. [Hospital Integration Flow](./flows/hospital-integration.md)
+9. [Policy Management Flow](./flows/policy-management.md)
+10. [Employer Dashboard Flow](./flows/employer-dashboard.md)
+11. [Claim Support Flow](./flows/claim-support.md)
+12. [Subscription Management Flow](./flows/subscription-management.md)
+13. [File Upload Flow](./flows/file-upload.md)
 
 
 ## Overview
